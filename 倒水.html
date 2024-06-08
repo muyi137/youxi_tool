@@ -1,0 +1,491 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <title>倒水工具</title>
+	<style type="text/css">
+		canvas {
+			border: 1px solid white;
+		}
+
+		.disable-dbl-tap-zoom {
+			touch-action: manipulation;
+		}
+
+        .color-box {
+            border: 1px solid black;
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin: 3px;
+            cursor: pointer;
+        }
+
+        .color-checkbox {
+            border: 1px solid black;
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin: 3px;
+            cursor: pointer;
+        }
+        .option {
+            margin-bottom: 5px;
+            }
+
+        /* 通用按钮样式 */
+        .button {
+            display: inline-block;
+            border-radius: 4px;
+            border: black;
+            color: white; /* 文字颜色 */
+            text-align: center;
+            text-decoration: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 2px; /* 内边距 */
+            margin: 2px; /* 外边距 */
+			height: 35px;
+        }
+
+            .button Img {
+                max-width: 80%; /* 限制图片最大宽度，避免过大 */
+                max-height: 80%; /* 限制图片最大高度，避免过大 */
+            }
+	</style>
+
+	<link rel="stylesheet" href="https://cdn.staticfile.org/font-awesome/4.7.0/css/font-awesome.css">
+	<script type="text/javascript" src="//api.tongjiniao.com/c?_=591661499739787264" async></script>
+</head>
+<body>
+    <h3>倒水工具</h3>
+	<br />
+    <div id="color-options">
+        <!-- 选项和颜色方块将动态生成 -->
+    </div>
+	<div>
+		<input type="file" id="fileInput" accept="image/png, image/jpeg" style="display: none;" />
+		<table cellpadding="0" cellspacing="0" width="0" border="0">
+			<tbody>
+				<tr>
+					<td>
+						<div style="position: relative;">
+							<canvas id="canvasOutput" class="disable-dbl-tap-zoom"></canvas>
+							<canvas id="canvasSelectColor" style="position: absolute; top: 0px; left: 0px; visibility: hidden;"></canvas>
+						</div>
+					</td>
+				</tr>
+				<tr>
+					<td align="center">
+						<p id="status">加载OpenCV中，请等待...</p>
+					</td>
+				</tr>
+				<tr>
+					<td align="center">
+                        <p><span id="counter"></span></p>
+					</td>
+				</tr>
+				<tr>
+					<td align="center">
+						<button type="button" id="InputButton" class="disable-dbl-tap-zoom" style="font-size:18px">选择截屏图片</button>
+						<button type="button" id="AddBottle" class="button" style="background-color: rgb(174, 137, 85)">
+							<img src="addbottle.png">
+						</button>
+						<button type="button" id="ColorOK" class="disable-dbl-tap-zoom" style="font-size:18px">开始计算</button>
+						<button type="button" class="btn btn-primary btn-sm disable-dbl-tap-zoom" style="font-size:18px" id="step" disabled>
+							<i class="fa fa-caret-right"></i> 下一步
+						</button>
+						<button type="button" class="btn btn-warning btn-sm disable-dbl-tap-zoom" style="font-size:18px" id="reset" disabled>
+							<i class="fa fa-undo"></i> 重置
+						</button>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+	<div>
+		<img id="imageSrc" style="display: none;" />
+	</div>
+	<div>
+		<canvas id="src" style="display: none;"></canvas>
+	</div>
+	<div>
+		<canvas id="mask" style="display: none;"></canvas>
+	</div>
+
+    <script type="text/javascript">
+        let g_Select = [
+            {
+                marginTop: 0,
+                marginLeft: 0,
+                maskLow: 75,
+                color: {
+                    "未知": [156, 170, 170, 'rgba(156, 170, 170, 1)'],
+                    "空": [15, 41, 52, 'rgba(15, 41, 52, 0)'],
+                    "浅蓝": [94, 170, 233, 'rgba(94, 170, 233, 1)'],
+                    "蓝": [12, 95, 215, 'rgba(12, 95, 215, 1)'],
+                    "青": [73, 62, 198, 'rgba(73, 62, 198, 1)'],
+                    "浅紫": [222, 151, 224, 'rgba(222, 151, 224, 1)'],
+                    "紫": [141, 56, 213, 'rgba(141, 56, 213, 1)'],
+                    "浅绿": [85, 198, 58, 'rgba(85, 198, 58, 1)'],
+                    "绿": [16, 97, 94, 'rgba(16,	97,	94, 1)'],
+                    "肉色": [255, 209, 184, 'rgba(255, 209, 184, 1)'],
+                    "黄": [239, 189, 13, 'rgba(239, 189, 13, 1)'],
+                    "橙": [245, 145, 42, 'rgba(245, 145, 42, 1)'],
+                    "粉": [236, 98, 127, 'rgba(236, 98, 127, 1)'],
+                    "红": [189, 31, 24, 'rgba(189, 31, 24, 1)'],
+                    "棕": [105, 31, 57, 'rgba(105, 31, 57, 1)'],
+                    "灰": [101, 102, 104, 'rgba(101, 102, 104, 1)']
+                }
+            },
+            {
+                marginLeft: 0,
+                marginTop: -0.04,
+                maskLow: 110,
+                color: {
+                    "未知": [252, 251, 247, "rgb(252, 251, 247)"],
+                    "空": [88, 54, 45, "rgb(88, 54, 45)"],
+                    "颜色1": [88, 186, 188, "rgb(88, 186, 188)"],
+                    "颜色2": [62, 123, 205, "rgb(62, 123, 205)"],
+                    "颜色3": [116, 91, 195, "rgb(116, 91, 195)"],
+                    "颜色4": [56, 43, 121, "rgb(56, 43, 121)"],
+                    "颜色5": [243, 152, 228, "rgb(243, 152, 228)"],
+                    "颜色6": [123, 28, 126, "rgb(123, 28, 126)"],
+                    "颜色7": [52, 172, 64, "rgb(52, 172, 64)"],
+                    "颜色8": [30, 99, 50, "rgb(30, 99, 50)"],
+                    "颜色9": [223, 175, 111, "rgb(223, 175, 111)"],
+                    "颜色10": [149, 115, 8, "rgb(149, 115, 8)"],
+                    "颜色11": [206, 85, 12, "rgb(206, 85, 12)"],
+                    "颜色12": [159, 25, 26, "rgb(159, 25, 26)"],
+                    "颜色13": [191, 61, 105, "rgb(191, 61, 105)"],
+                    "颜色14": [149, 149, 149, "rgb(149, 149, 149)"]
+                }
+            }
+        ];
+
+        var usedColors = null;
+        // 动态创建单选按钮和颜色方块
+        function createColorOptions(selectArray) {
+            var defaultChecked = false;
+            const container = document.getElementById('color-options');
+            for (const colors of selectArray) {
+                const option = document.createElement('div');
+                option.classList.add('option');
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.classList.add('color-checkbox');
+                radio.name = 'color-choice'; // 确保所有单选按钮有相同的name属性，以形成单选组
+                if (!defaultChecked) {
+                    radio.checked = true;
+                    defaultChecked = true;
+                    usedColors = colors;
+                }
+                radio.onchange = () => {
+                    if (radio.checked) {
+                        usedColors = colors;
+                    }
+                }
+                //radio.style.display = 'none'; // 隐藏单选按钮，只显示颜色方块
+                option.appendChild(radio);
+                //const label = document.createElement('label');
+                //label.innerText = key;
+                //option.appendChild(label)
+                for (const color in colors.color) {
+                    if (color.startsWith("未知") || color.startsWith("空"))
+                        continue;
+                    const colorBox = document.createElement('div');
+                    colorBox.classList.add('color-box');
+                    colorBox.style.backgroundColor = colors.color[color][3]; // 使用rgba值设置背景颜色
+                    option.appendChild(colorBox);
+                }
+
+                container.appendChild(option);
+            }
+        }
+
+        // 调用函数创建选项和颜色方块
+        createColorOptions(g_Select);
+    </script>
+
+	<script src="bottle.js" type="text/javascript"></script>
+	<script type="text/javascript">var solver = new Object();</script>
+	<script src="mitidalu.js" type="text/javascript"></script>
+	<script src="graphics.js" type="text/javascript"></script>
+
+	<script type="text/javascript">
+
+		let imgElement = document.getElementById('imageSrc');
+		imgElement.style.display = "none";
+
+		// src是为了debug时显示处理中间结果的一个元素
+		let srcImg = document.getElementById('src');
+		srcImg.style.display = "none";
+
+		// mask是为了debug时显示处理中间结果的一个元素
+		let mask = document.getElementById('mask');
+		mask.style.display = "none";
+
+		let inputFile = document.getElementById('fileInput');
+		//inputFile.style.opacity = 0;
+		inputFile.addEventListener('change', (e) => {
+			//imgElement.width = 1080;
+			imgElement.src = URL.createObjectURL(e.target.files[0]);
+		}, false);
+
+		let inputButton = document.getElementById('InputButton');
+		inputButton.onclick = (event) => { inputFile.click(); };
+
+		function ShowStatus(string) {
+			document.getElementById('status').innerHTML = string;
+		}
+
+		let status = { nowork: 0, correctColor: 1, solving: 2, solved: 3, selectColor: 3, noResult: 4, wrong: 5 };
+		let currentStatus = status.nowork;
+
+		var movingProblem = new Object();
+		function onStepButtonPress() {
+			let pure = pureMethod[pureIndex];
+			movingProblem.bottles[pure.from].pureTo(movingProblem.bottles[pure.to]);
+			gameDisplay.show(movingProblem);
+			pureIndex++;
+			if (movingProblem.bottles[pure.from].m_top == BLOCK_UNKNOWN) {
+				// 露出了一个未知块，请用户选择颜色
+				colorSelecting = true;
+				gameDisplay.initSelector(movingProblem, pure.from, movingProblem.bottles[pure.from].m_blanks);
+			}
+			handleButtonStatus();
+		}
+
+		function onResetButtonPress() {
+			if (orgProblemChanged) {
+				// 翻出了新块，需要重新开始计算
+				var problem = cloneProblem(orgProblem);
+				orgProblemChanged = false;
+				colorSelecting = false;
+				pureMethod = new Array();
+				pureIndex = 0;
+				ShowStatus('解题中，请等待......');
+				counter.innerHTML = '';
+				currentStatus = status.solving;
+				if (FixQuestionMark(orgProblem)) gameDisplay.show(orgProblem);
+				requestIdleCallback(() => { SolveProblem(problem, true); });
+			}
+			else if (pureMethod.length > 0) {
+				movingProblem = clone(orgProblem);
+				pureIndex = 0;
+			}
+			gameDisplay.show(orgProblem);
+			handleButtonStatus();
+		}
+
+		function handleButtonStatus() {
+			switch (currentStatus) {
+				case status.correctColor:
+					colorButton.disabled = false;
+					stepButton.disabled = true;
+					resetButton.disabled = true;
+					addButton.disabled = false;
+					return;
+
+				case status.solving:
+				case status.wrong:
+					colorButton.disabled = true;
+					stepButton.disabled = true;
+					resetButton.disabled = true;
+					addButton.disabled = true;
+					return;
+			}
+
+			colorButton.disabled = true;
+			stepButton.disabled = true;
+			resetButton.disabled = true;
+			addButton.disabled = true;
+
+			if (pureMethod.length > 0) {
+				const index = pureIndex;
+				const numSolutionSteps = pureMethod.length.toString();
+				counter.innerHTML = ` ${index}/${numSolutionSteps}`;
+
+				if (!colorSelecting) {
+					if (pureIndex < pureMethod.length) {
+						stepButton.disabled = false;
+						if (pureIndex > 0) {
+							resetButton.disabled = false;
+							addButton.disabled = false;
+						}
+					}
+					else {
+						resetButton.disabled = false;
+							addButton.disabled = false;
+					}
+				}
+			} else {
+				if (orgProblemChanged) {
+					resetButton.disabled = false;
+					addButton.disabled = false;
+					counter.innerHTML = '有翻出的新色块，请按“重置”按钮重新计算';
+				}
+				else {
+					counter.innerHTML = '问题无解';
+				}
+			}
+		}
+
+		let addButton = document.getElementById('AddBottle');
+        addButton.addEventListener('click', onAddBottleButtonPress);
+		let colorButton = document.getElementById('ColorOK');
+		colorButton.addEventListener('click', onColorButtonPress);
+		let stepButton = document.getElementById('step');
+		stepButton.addEventListener('click', onStepButtonPress);
+		let resetButton = document.getElementById('reset');
+		resetButton.addEventListener('click', onResetButtonPress);
+		let counter = document.querySelector('#counter');
+
+		const gameDisplay = new GameDisplay('canvasOutput', 450, 580, 'canvasSelectColor');
+
+		const isMobile = /(iPhone|iPad|iPod|iOS|Android|Linux armv8l|Linux armv7l|Linux aarch64)/i.test(navigator.platform);
+		let windowRadio = window.innerWidth / window.innerHeight;
+		if (isMobile)
+			document.body.style.zoom = 2;
+		else
+			document.body.style.zoom = 1;
+
+		var orgProblem = new Object();
+		var orgProblemChanged = false;
+		var colorSelecting = false;
+		var pureMethod = new Array();
+		var pureIndex = 0;
+
+		function InitState() {
+			orgProblem = new Object();
+			currentStatus = status.nowork;
+			orgProblemChanged = false;
+			colorSelecting = false;
+			pureMethod = new Array();
+			pureIndex = 0;
+		}
+
+		function SolveProblem(problem, needReset) {
+			try {
+				// 解题
+				let unknowns = GetUnknowns(problem);
+				if (unknowns == 0) {
+					var pure = Solve(problem);
+					if (pure == null) {
+						ShowStatus('找不到解决方案，问题无解!');
+						pureMethod = new Array();
+						currentStatus = status.noResult;
+					}
+					else {
+						ShowStatus('找到解决方案，请点“下一步”按钮跟随操作');
+						currentStatus = status.solved;
+						pureMethod = pure.slice();
+					}
+				}
+				else {
+					var best = FindMoreUnkonwns(problem);
+					if (best.pure.length > 0) {
+						ShowStatus(`可以翻出未知块`);
+						currentStatus = status.solved;
+						pureMethod = best.pure.slice();
+					}
+					else {
+						ShowStatus('无法翻出任何一个未知块');
+						currentStatus = status.noResult;
+						pureMethod = new Array();
+					}
+				}
+				if (needReset)
+					onResetButtonPress();
+				else {
+					pureIndex = 0;
+					handleButtonStatus();
+				}
+			}
+			catch (err) {
+				ShowStatus('搜索解决方案时出错：' + err.toString());
+				currentStatus = status.wrong;
+				handleButtonStatus();
+			}
+		}
+
+		imgElement.onload = function () {
+			InitState();	// 加载图片就意味着重新开始
+
+			let src = cv.imread(imgElement);
+            orgProblem = solver.init(src, usedColors);
+
+			gameDisplay.init(orgProblem);
+			gameDisplay.show(orgProblem);
+
+			currentStatus = status.correctColor;
+			gameDisplay.onColorChanged = (bottleId, blockId, color) => {
+				orgProblem.bottles[bottleId].setColor(blockId, color);
+				orgProblem.bottles[bottleId].Update();
+				gameDisplay.show(orgProblem);
+			}
+            gameDisplay.enableCorrectColor(true, orgProblem.color, true);
+            ShowStatus('请检查，可点击不正确的块修改颜色，确认正确后，<br>根据需要增加小瓶子，并点击“开始计算”按钮');
+			counter.innerHTML = '';
+			handleButtonStatus();
+		}
+
+		function onAddBottleButtonPress() {
+			if (orgProblem !== null) {
+				let col_index = orgProblem.cols.length - 1;
+				if (col_index > 0) {
+                    let bottle = new Bottle(1);
+                    bottle.initBottle();
+                    orgProblem.bottles.push(bottle);
+					orgProblem.cols[col_index]++;
+                    gameDisplay.init(orgProblem);
+                    gameDisplay.show(orgProblem);
+				}
+			}
+		}
+
+		function onColorButtonPress() {
+			gameDisplay.enableCorrectColor(false);
+			// 检查
+			if (!CheckProblem(orgProblem)) {
+				ShowStatus('<b>瓶子组合不符合要求，无法解题！请检查颜色组合并修改</b>');
+                gameDisplay.enableCorrectColor(true, orgProblem.color, true);
+
+				//cv.imshow('src', src);
+				//srcImg.style.display = "block";
+				//mask.style.display = "block";
+				//InitState();
+			}
+			else {
+				ShowStatus('解题中，请等待......');
+				counter.innerHTML = '';
+				srcImg.style.display = "none";
+				mask.style.display = "none";
+
+				orgProblemChanged = false;
+				currentStatus = status.solving;
+                if (FixQuestionMark(orgProblem)) gameDisplay.show(orgProblem);
+				requestIdleCallback(() => { SolveProblem(cloneProblem(orgProblem), true); });
+			}
+			handleButtonStatus();
+			//src.delete();
+		}
+
+		function onOpenCvReady() { // eslint-disable-line no-unused-vars
+			document.getElementById('status').innerHTML = '请选择截屏图片';
+		}
+
+		function onOpenCvError() { // eslint-disable-line no-unused-vars
+			let element = document.getElementById('status');
+			element.setAttribute('class', 'err');
+			element.innerHTML = '加载OpenCV失败，无法运作.';
+		}
+	</script>
+
+	<!--
+	<script src="opencv.js" type="text/javascript" onload="onOpenCvReady();" onerror="onOpenCvError();"></script>
+	-->
+	<script async src="https://docs.opencv.org/3.4.16/opencv.js" type="text/javascript" onload="onOpenCvReady();" onerror="onOpenCvError();"></script>
+</body>
+</html>
